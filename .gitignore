@@ -16,7 +16,6 @@ Pipfile.lock
 # Django
 *.log
 local_settings.py
-db.sqlite3
 /media/
 
 # Uploaded media
@@ -56,3 +55,4 @@ tmp/
 
 
 # End of .gitignore
+.vercel
