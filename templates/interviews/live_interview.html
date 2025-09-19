@@ -1,0 +1,403 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Live Interview{% endblock %}
+
+{% block extra_css %}
+<style>
+    .video-container {
+        position: relative;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        min-height: 400px;
+    }
+    
+    #localVideo {
+        width: 100%;
+        height: 400px;
+        object-fit: cover;
+        border-radius: 12px;
+    }
+    
+    .video-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 15px;
+        z-index: 10;
+    }
+    
+    .control-btn {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: none;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+    
+    .control-btn:hover { transform: scale(1.1); }
+    .btn-camera { background: #007bff; }
+    .btn-camera.off { background: #6c757d; }
+    .btn-mic { background: #28a745; }
+    .btn-mic.off { background: #dc3545; }
+    .btn-end { background: #dc3545; }
+    
+    .detection-panel {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" data-interview-id="{{ interview.id }}">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="mb-1">🔴 Live Interview</h3>
+                    <p class="text-muted mb-0">{{ interview.title|default:"Interview Session" }}</p>
+                </div>
+                <div>
+                    <div class="badge bg-danger fs-6 mb-2">
+                        <i class="fas fa-circle me-1"></i>LIVE
+                    </div>
+                    <div class="text-muted small">
+                        Started: {{ interview.start_time|date:"H:i" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Video Feed -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="video-container">
+                        <video id="localVideo" autoplay muted playsinline></video>
+                        
+                        <!-- Video Controls -->
+                        <div class="video-controls">
+                            <button class="control-btn btn-camera" id="cameraBtn" onclick="toggleCamera()">
+                                <i class="fas fa-video" id="cameraIcon"></i>
+                            </button>
+                            <button class="control-btn btn-mic" id="micBtn" onclick="toggleMic()">
+                                <i class="fas fa-microphone" id="micIcon"></i>
+                            </button>
+                            <button class="control-btn btn-end" onclick="endInterview()">
+                                <i class="fas fa-phone-slash"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Status Overlay -->
+                        <div style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px;">
+                            <span id="connectionStatus">
+                                <i class="fas fa-circle text-success"></i> Connected
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detection Panel -->
+        <div class="col-lg-4">
+            <div class="detection-panel p-4 mb-4">
+                <h5 class="mb-3">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    Detection Status
+                </h5>
+                
+                <div class="mb-3" id="detectionStatuses">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>System Monitoring</span>
+                        <span id="systemStatus">🟢</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Camera Feed</span>
+                        <span id="cameraStatus">🟢</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Face Detection</span>
+                        <span id="faceStatus">🟢</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Focus Monitoring</span>
+                        <span id="focusStatus">🟢</span>
+                    </div>
+                </div>
+
+                <!-- Recent Events -->
+                <div class="mt-4">
+                    <h6>Recent Events</h6>
+                    <div id="recentEvents" style="max-height: 200px; overflow-y: auto;">
+                        <small class="text-muted">No events detected</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interview Details -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Interview Details</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Interviewer:</strong><br>{{ interview.interviewer.get_full_name|default:interview.interviewer.username }}</p>
+                    <p><strong>Started:</strong><br>{{ interview.start_time|date:"M d, Y - H:i" }}</p>
+                    <p><strong>Duration:</strong><br>{{ interview.duration|default:"Not specified" }} minutes</p>
+                    <p><strong>Status:</strong><br><span class="badge bg-danger">{{ interview.get_status_display }}</span></p>
+                </div>
+            </div>
+
+            <!-- Guidelines -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Guidelines
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled small">
+                        <li><i class="fas fa-check text-success me-2"></i>Keep your face visible</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Maintain eye contact</li>
+                        <li><i class="fas fa-times text-danger me-2"></i>Don't look away frequently</li>
+                        <li><i class="fas fa-times text-danger me-2"></i>Avoid using phones/devices</li>
+                        <li><i class="fas fa-times text-danger me-2"></i>Don't have notes visible</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let localStream = null;
+let isCameraOn = false;
+let isMicOn = false;
+const INTERVIEW_ID = {{ interview.id }};
+
+// 🚀 Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startCamera();
+    startDetectionStatusUpdates();
+    setupPageUnloadHandler();
+});
+
+// 📹 Camera Functions
+async function startCamera() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 1280, height: 720 },
+            audio: true
+        });
+        
+        document.getElementById('localVideo').srcObject = localStream;
+        isCameraOn = true;
+        isMicOn = true;
+        updateControlButtons();
+        
+        document.getElementById('cameraStatus').textContent = '🟢';
+        document.getElementById('connectionStatus').innerHTML = 
+            '<i class="fas fa-circle text-success"></i> Camera Active';
+            
+    } catch (error) {
+        console.error('❌ Camera error:', error);
+        alert('Error accessing camera/microphone. Please check permissions.');
+        document.getElementById('cameraStatus').textContent = '🔴';
+        document.getElementById('connectionStatus').innerHTML = 
+            '<i class="fas fa-circle text-danger"></i> Camera Error';
+    }
+}
+
+function toggleCamera() {
+    if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            isCameraOn = videoTrack.enabled;
+            updateControlButtons();
+            document.getElementById('cameraStatus').textContent = isCameraOn ? '🟢' : '🔴';
+        }
+    }
+}
+
+function toggleMic() {
+    if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            isMicOn = audioTrack.enabled;
+            updateControlButtons();
+        }
+    }
+}
+
+function updateControlButtons() {
+    const cameraBtn = document.getElementById('cameraBtn');
+    const cameraIcon = document.getElementById('cameraIcon');
+    const micBtn = document.getElementById('micBtn');
+    const micIcon = document.getElementById('micIcon');
+    
+    // Update camera button
+    if (isCameraOn) {
+        cameraBtn.className = 'control-btn btn-camera';
+        cameraIcon.className = 'fas fa-video';
+    } else {
+        cameraBtn.className = 'control-btn btn-camera off';
+        cameraIcon.className = 'fas fa-video-slash';
+    }
+    
+    // Update mic button
+    if (isMicOn) {
+        micBtn.className = 'control-btn btn-mic';
+        micIcon.className = 'fas fa-microphone';
+    } else {
+        micBtn.className = 'control-btn btn-mic off';
+        micIcon.className = 'fas fa-microphone-slash';
+    }
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+function endInterview() {
+    if (!confirm('Are you sure you want to end the interview?')) return;
+
+    // Stop local camera/mic first
+    stopCamera();
+
+    // Send POST to end endpoint so server-side logic runs (stop_detection, save end_time, etc.)
+    const csrftoken = getCookie('csrftoken');
+    fetch('{% url 'interviews:end_interview' interview.id %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    }).then(response => {
+        if (response.redirected) {
+            // follow redirect
+            window.location.href = response.url;
+            return;
+        }
+
+        if (response.ok) {
+            // If JSON response, try to parse and act accordingly
+            return response.json().then(data => {
+                // If view returns a URL to go to, follow it
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    // Fall back to interview detail
+                    window.location.href = '{% url "interviews:interview_detail" interview.id %}';
+                }
+            }).catch(() => {
+                window.location.href = '{% url "interviews:interview_detail" interview.id %}';
+            });
+        } else {
+            return response.text().then(txt => { throw new Error(txt || 'Failed to end interview'); });
+        }
+    }).catch(err => {
+        console.error('Error ending interview:', err);
+        alert('Failed to end interview. Please try again.');
+    });
+}
+
+function stopCamera() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+}
+
+// 📊 Detection Status Updates - 🔧 FIXED: Use proper detection URLs
+function startDetectionStatusUpdates() {
+    setInterval(function() {
+        fetch('{% url "detection:status" interview.id %}')
+            .then(response => response.json())
+            .then(data => {
+                updateDetectionStatus(data);
+            })
+            .catch(error => {
+                console.error('Detection status error:', error);
+                document.getElementById('systemStatus').textContent = '🔴';
+            });
+    }, 3000);
+}
+
+function updateDetectionStatus(data) {
+    // Update system status
+    document.getElementById('systemStatus').textContent = 
+        data.detection_active ? '🟢' : '🔴';
+    
+    // Update recent events
+    if (data.recent_events && data.recent_events.length > 0) {
+        const eventsContainer = document.getElementById('recentEvents');
+        eventsContainer.innerHTML = '';
+        
+        data.recent_events.slice(0, 5).forEach(event => {
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'mb-2 p-2 bg-light text-dark rounded';
+            eventDiv.innerHTML = `
+                <small class="fw-bold text-danger">${event.event_type}</small><br>
+                <small class="text-muted">${new Date(event.timestamp).toLocaleTimeString()}</small>
+            `;
+            eventsContainer.appendChild(eventDiv);
+        });
+    }
+}
+
+// 🚪 Page Unload Handler - 🔧 FIXED: Use proper detection stop URL
+function setupPageUnloadHandler() {
+    window.addEventListener('beforeunload', function() {
+        // Stop camera
+        stopCamera();
+
+        // Stop detection using fetch with keepalive and CSRF header so Django accepts it
+        try {
+            const csrftoken = getCookie('csrftoken');
+            // use fetch keepalive to send a POST before unload; includes same-origin cookies
+            fetch('{% url "detection:stop" interview.id %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({action: 'stop'}),
+                keepalive: true,
+                credentials: 'same-origin'
+            }).catch(err => {
+                // If fetch fails, as a last resort attempt sendBeacon without headers
+                try { navigator.sendBeacon('{% url "detection:stop" interview.id %}'); } catch(e) {}
+            });
+        } catch (e) {
+            // fallback to sendBeacon if cookies or fetch not available
+            try { navigator.sendBeacon('{% url "detection:stop" interview.id %}'); } catch(err) {}
+        }
+    });
+    
+    // Also handle visibility change (tab switching, etc.)
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') {
+            console.log('🙈 User left the interview page');
+        }
+    });
+}
+</script>
+{% endblock %}

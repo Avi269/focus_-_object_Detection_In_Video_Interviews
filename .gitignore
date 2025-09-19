@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+ENV/
+env/
+nenv/
+.venv/
+
+# Pipenv
+Pipfile.lock
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+/media/
+
+# Uploaded media
+media/
+
+# Pytest
+.pytest_cache/
+
+# MyPy
+.mypy_cache/
+
+# VS Code
+.vscode/
+
+# Byte-compiled / compiled files
+*.so
+*.dylib
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+
+# macOS
+*.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Logs and temp
+*.log
+tmp/
+
+
+# End of .gitignore

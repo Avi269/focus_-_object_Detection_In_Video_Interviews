@@ -1,0 +1,551 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register - Proctoring System{% endblock %}
+
+{% block extra_css %}
+<style>
+.register-container {
+    padding: 2rem 0;
+}
+
+.register-card {
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.register-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    text-align: center;
+}
+
+.form-floating label {
+    color: #6c757d;
+}
+
+.btn-register {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-register:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.availability-check {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+}
+
+.availability-check i {
+    font-size: 1rem;
+}
+
+.password-strength {
+    height: 5px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+.password-strength-bar {
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.strength-weak { background: #dc3545; width: 25%; }
+.strength-fair { background: #ffc107; width: 50%; }
+.strength-good { background: #28a745; width: 75%; }
+.strength-strong { background: #198754; width: 100%; }
+
+.role-info {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.step-indicator {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.step {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 5px;
+    position: relative;
+}
+
+.step.active {
+    background: #667eea;
+    color: white;
+}
+
+.step.completed {
+    background: #28a745;
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid register-container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card register-card">
+                <div class="register-header">
+                    <div class="mb-3">
+                        <i class="fas fa-user-plus fa-3x"></i>
+                    </div>
+                    <h3 class="mb-2">Join Our Platform!</h3>
+                    <p class="mb-0 opacity-75">Create your account to get started</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <!-- Step Indicator -->
+                    <div class="step-indicator">
+                        <div class="step active">1</div>
+                        <div class="step">2</div>
+                        <div class="step">3</div>
+                    </div>
+                    
+                    <form method="post" id="registerForm">
+                        {% csrf_token %}
+                        
+                        <!-- Step 1: Basic Info -->
+                        <div class="form-step" id="step1">
+                            <h5 class="mb-3">
+                                <i class="fas fa-user me-2"></i>Basic Information
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3 position-relative">
+                                        {{ form.username }}
+                                        <label for="{{ form.username.id_for_label }}">Username *</label>
+                                        <div class="availability-check" id="usernameCheck">
+                                            <i class="fas fa-spinner fa-spin d-none"></i>
+                                        </div>
+                                        {% if form.username.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.username.errors|first }}</div>
+                                        {% endif %}
+                                        {% if form.username.help_text %}
+                                            <div class="form-text">{{ form.username.help_text }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        {{ form.role }}
+                                        <label for="{{ form.role.id_for_label }}">Role *</label>
+                                        {% if form.role.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.role.errors|first }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Role Information -->
+                            <div class="role-info" id="roleInfo" style="display: none;">
+                                <div class="role-description"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2: Personal Details -->
+                        <div class="form-step d-none" id="step2">
+                            <h5 class="mb-3">
+                                <i class="fas fa-id-card me-2"></i>Personal Details
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        {{ form.first_name }}
+                                        <label for="{{ form.first_name.id_for_label }}">First Name *</label>
+                                        {% if form.first_name.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.first_name.errors|first }}</div>
+                                        {% endif %}
+                                        {% if form.first_name.help_text %}
+                                            <div class="form-text">{{ form.first_name.help_text }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        {{ form.last_name }}
+                                        <label for="{{ form.last_name.id_for_label }}">Last Name *</label>
+                                        {% if form.last_name.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.last_name.errors|first }}</div>
+                                        {% endif %}
+                                        {% if form.last_name.help_text %}
+                                            <div class="form-text">{{ form.last_name.help_text }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-floating mb-3 position-relative">
+                                {{ form.email }}
+                                <label for="{{ form.email.id_for_label }}">Email Address *</label>
+                                <div class="availability-check" id="emailCheck">
+                                    <i class="fas fa-spinner fa-spin d-none"></i>
+                                </div>
+                                {% if form.email.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.email.errors|first }}</div>
+                                {% endif %}
+                                {% if form.email.help_text %}
+                                    <div class="form-text">{{ form.email.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3: Security -->
+                        <div class="form-step d-none" id="step3">
+                            <h5 class="mb-3">
+                                <i class="fas fa-shield-alt me-2"></i>Security Setup
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        {{ form.password1 }}
+                                        <label for="{{ form.password1.id_for_label }}">Password *</label>
+                                        <div class="password-strength">
+                                            <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                                        </div>
+                                        {% if form.password1.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.password1.errors|first }}</div>
+                                        {% endif %}
+                                        <div class="form-text" id="passwordHelp">
+                                            {% if form.password1.help_text %}{{ form.password1.help_text }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        {{ form.password2 }}
+                                        <label for="{{ form.password2.id_for_label }}">Confirm Password *</label>
+                                        <div id="passwordMatch" class="form-text"></div>
+                                        {% if form.password2.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.password2.errors|first }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Terms and Conditions -->
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="agreeTerms" required>
+                                <label class="form-check-label" for="agreeTerms">
+                                    I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a> *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Non-field Errors -->
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <div>{{ form.non_field_errors|first }}</div>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Navigation Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary" id="prevBtn" onclick="changeStep(-1)" style="display: none;">
+                                <i class="fas fa-arrow-left me-2"></i>Previous
+                            </button>
+                            <button type="button" class="btn btn-primary" id="nextBtn" onclick="changeStep(1)">
+                                Next<i class="fas fa-arrow-right ms-2"></i>
+                            </button>
+                            <button type="submit" class="btn btn-register d-none" id="submitBtn">
+                                <i class="fas fa-user-plus me-2"></i>
+                                <span class="btn-text">Create Account</span>
+                                <i class="fas fa-spinner fa-spin me-2 d-none" id="registerSpinner"></i>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Login Link -->
+                    <div class="text-center mt-4">
+                        <p class="mb-0">Already have an account? 
+                            <a href="{% url 'accounts:login' %}" class="text-decoration-none">Sign in here</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+const totalSteps = 3;
+
+// Role descriptions
+const roleDescriptions = {
+    'candidate': {
+        icon: 'fas fa-user',
+        title: 'Candidate',
+        description: 'Join interviews, take assessments, and showcase your skills to potential employers.'
+    },
+    'interviewer': {
+        icon: 'fas fa-chalkboard-teacher', 
+        title: 'Interviewer',
+        description: 'Conduct interviews, evaluate candidates, and make hiring decisions with our proctoring tools.'
+    },
+    'admin': {
+        icon: 'fas fa-user-shield',
+        title: 'Administrator', 
+        description: 'Manage the platform, oversee interviews, and configure system settings.'
+    }
+};
+
+// Step navigation
+function changeStep(direction) {
+    const currentStepEl = document.getElementById(`step${currentStep}`);
+    
+    // Validate current step
+    if (direction > 0 && !validateStep(currentStep)) {
+        return;
+    }
+    
+    // Hide current step
+    currentStepEl.classList.add('d-none');
+    
+    // Update step number
+    currentStep += direction;
+    
+    // Show new step
+    const newStepEl = document.getElementById(`step${currentStep}`);
+    newStepEl.classList.remove('d-none');
+    
+    // Update step indicators
+    updateStepIndicators();
+    
+    // Update navigation buttons
+    updateNavigationButtons();
+}
+
+function updateStepIndicators() {
+    for (let i = 1; i <= totalSteps; i++) {
+        const stepEl = document.querySelector(`.step:nth-child(${i})`);
+        stepEl.className = 'step';
+        
+        if (i < currentStep) {
+            stepEl.classList.add('completed');
+        } else if (i === currentStep) {
+            stepEl.classList.add('active');
+        }
+    }
+}
+
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Show/hide previous button
+    prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
+    
+    // Show/hide next vs submit button
+    if (currentStep === totalSteps) {
+        nextBtn.classList.add('d-none');
+        submitBtn.classList.remove('d-none');
+    } else {
+        nextBtn.classList.remove('d-none');
+        submitBtn.classList.add('d-none');
+    }
+}
+
+function validateStep(step) {
+    const stepEl = document.getElementById(`step${step}`);
+    const requiredFields = stepEl.querySelectorAll('input[required], select[required]');
+    
+    let isValid = true;
+    requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+            field.classList.add('is-invalid');
+            isValid = false;
+        } else {
+            field.classList.remove('is-invalid');
+        }
+    });
+    
+    return isValid;
+}
+
+// Username availability check
+let usernameTimeout;
+document.getElementById('{{ form.username.id_for_label }}').addEventListener('input', function() {
+    const username = this.value;
+    const checkEl = document.getElementById('usernameCheck');
+    
+    clearTimeout(usernameTimeout);
+    
+    if (username.length >= 3) {
+        usernameTimeout = setTimeout(() => {
+            checkAvailability('username', username, 'usernameCheck');
+        }, 500);
+    } else {
+        checkEl.innerHTML = '';
+    }
+});
+
+// Email availability check
+let emailTimeout;
+document.getElementById('{{ form.email.id_for_label }}').addEventListener('input', function() {
+    const email = this.value;
+    const checkEl = document.getElementById('emailCheck');
+    
+    clearTimeout(emailTimeout);
+    
+    if (email.includes('@')) {
+        emailTimeout = setTimeout(() => {
+            checkAvailability('email', email, 'emailCheck');
+        }, 500);
+    } else {
+        checkEl.innerHTML = '';
+    }
+});
+
+function checkAvailability(type, value, elementId) {
+    const checkEl = document.getElementById(elementId);
+    checkEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    fetch(`{% url 'accounts:check_username' %}?${type}=${value}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.available) {
+                checkEl.innerHTML = '<i class="fas fa-check text-success"></i>';
+            } else {
+                checkEl.innerHTML = '<i class="fas fa-times text-danger"></i>';
+            }
+        })
+        .catch(error => {
+            checkEl.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i>';
+        });
+}
+
+// Password strength checker
+document.getElementById('{{ form.password1.id_for_label }}').addEventListener('input', function() {
+    const password = this.value;
+    const strengthBar = document.getElementById('passwordStrengthBar');
+    const helpText = document.getElementById('passwordHelp');
+    
+    let strength = 0;
+    let message = '';
+    
+    if (password.length >= 8) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    
+    // Update strength bar
+    strengthBar.className = 'password-strength-bar';
+    if (strength >= 4) {
+        strengthBar.classList.add('strength-strong');
+        message = 'Strong password';
+    } else if (strength >= 3) {
+        strengthBar.classList.add('strength-good');
+        message = 'Good password';
+    } else if (strength >= 2) {
+        strengthBar.classList.add('strength-fair');
+        message = 'Fair password';
+    } else if (password.length > 0) {
+        strengthBar.classList.add('strength-weak');
+        message = 'Weak password';
+    }
+    
+    helpText.textContent = message;
+});
+
+// Password confirmation check
+document.getElementById('{{ form.password2.id_for_label }}').addEventListener('input', function() {
+    const password1 = document.getElementById('{{ form.password1.id_for_label }}').value;
+    const password2 = this.value;
+    const matchEl = document.getElementById('passwordMatch');
+    
+    if (password2.length > 0) {
+        if (password1 === password2) {
+            matchEl.innerHTML = '<i class="fas fa-check text-success me-1"></i>Passwords match';
+            matchEl.className = 'form-text text-success';
+        } else {
+            matchEl.innerHTML = '<i class="fas fa-times text-danger me-1"></i>Passwords do not match';
+            matchEl.className = 'form-text text-danger';
+        }
+    } else {
+        matchEl.innerHTML = '';
+    }
+});
+
+// Role selection change
+document.getElementById('{{ form.role.id_for_label }}').addEventListener('change', function() {
+    const role = this.value;
+    const roleInfoEl = document.getElementById('roleInfo');
+    const roleDescription = roleInfoEl.querySelector('.role-description');
+    
+    if (role && roleDescriptions[role]) {
+        const info = roleDescriptions[role];
+        roleDescription.innerHTML = `
+            <div class="d-flex align-items-center mb-2">
+                <i class="${info.icon} text-primary me-2"></i>
+                <strong>${info.title}</strong>
+            </div>
+            <p class="mb-0 text-muted">${info.description}</p>
+        `;
+        roleInfoEl.style.display = 'block';
+    } else {
+        roleInfoEl.style.display = 'none';
+    }
+});
+
+// Form submission
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = submitBtn.querySelector('.btn-text');
+    const spinner = document.getElementById('registerSpinner');
+    
+    // Show loading state
+    btnText.textContent = 'Creating Account...';
+    spinner.classList.remove('d-none');
+    submitBtn.disabled = true;
+    
+    // Auto-restore if no redirect happens
+    setTimeout(() => {
+        btnText.textContent = 'Create Account';
+        spinner.classList.add('d-none');
+        submitBtn.disabled = false;
+    }, 10000);
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    updateStepIndicators();
+    updateNavigationButtons();
+});
+</script>
+{% endblock %}

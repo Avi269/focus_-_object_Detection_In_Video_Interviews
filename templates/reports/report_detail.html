@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Report Details - Proctoring System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> Interview Report
+                </h3>
+                <div>
+                    <a href="{% url 'reports:export_pdf' report.id %}" class="btn btn-outline-danger">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </a>
+                    <a href="{% url 'reports:export_csv' report.id %}" class="btn btn-outline-success">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Report Header -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5>Candidate Information</h5>
+                        <p><strong>Name:</strong> {{ report.candidate_name }}</p>
+                        <p><strong>Username:</strong> {{ report.interview.candidate.username }}</p>
+                        <p><strong>Email:</strong> {{ report.interview.candidate.email }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Interview Details</h5>
+                        <p><strong>Date:</strong> {{ report.interview.start_time|date:"M d, Y H:i" }}</p>
+                        <p><strong>Duration:</strong> 
+                            {% if report.total_duration %}
+                                {{ report.total_duration }}
+                            {% else %}
+                                <span class="text-muted">Not available</span>
+                            {% endif %}
+                        </p>
+                        <p><strong>Generated:</strong> {{ report.generated_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                </div>
+                
+                <!-- Integrity Score -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5>Integrity Score</h5>
+                        <div class="progress mb-2" style="height: 30px;">
+                            <div class="progress-bar 
+                                {% if report.integrity_score >= 90 %}bg-success
+                                {% elif report.integrity_score >= 70 %}bg-warning
+                                {% elif report.integrity_score >= 50 %}bg-danger
+                                {% else %}bg-dark{% endif %}" 
+                                role="progressbar" 
+                                style="width: {{ report.integrity_score }}%"
+                                aria-valuenow="{{ report.integrity_score }}" 
+                                aria-valuemin="0" 
+                                aria-valuemax="100">
+                                {{ report.integrity_score }}/100
+                            </div>
+                        </div>
+                        <p class="text-muted">
+                            {% if report.integrity_score >= 90 %}
+                                <i class="fas fa-check-circle text-success"></i> Excellent integrity score
+                            {% elif report.integrity_score >= 70 %}
+                                <i class="fas fa-exclamation-triangle text-warning"></i> Good integrity score
+                            {% elif report.integrity_score >= 50 %}
+                                <i class="fas fa-exclamation-circle text-danger"></i> Fair integrity score
+                            {% else %}
+                                <i class="fas fa-times-circle text-dark"></i> Poor integrity score
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Detection Events Summary -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5>Detection Events Summary</h5>
+                        <div class="row">
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h4 class="text-{% if report.focus_lost_events == 0 %}success{% elif report.focus_lost_events <= 3 %}warning{% else %}danger{% endif %}">
+                                            {{ report.focus_lost_events }}
+                                        </h4>
+                                        <small class="text-muted">Focus Lost</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h4 class="text-{% if report.no_face_events == 0 %}success{% else %}warning{% endif %}">
+                                            {{ report.no_face_events }}
+                                        </h4>
+                                        <small class="text-muted">No Face</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h4 class="text-{% if report.phone_detected_events == 0 %}success{% else %}danger{% endif %}">
+                                            {{ report.phone_detected_events }}
+                                        </h4>
+                                        <small class="text-muted">Phone Detected</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h4 class="text-{% if report.notes_detected_events == 0 %}success{% else %}danger{% endif %}">
+                                            {{ report.notes_detected_events }}
+                                        </h4>
+                                        <small class="text-muted">Notes Detected</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Detailed Breakdown -->
+                <div class="row">
+                    <div class="col-12">
+                        <h5>Detailed Event Breakdown</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Event Type</th>
+                                        <th>Count</th>
+                                        <th>Severity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Focus Lost Events</td>
+                                        <td>{{ report.focus_lost_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.focus_lost_events == 0 %}success{% elif report.focus_lost_events <= 3 %}warning{% else %}danger{% endif %}">
+                                                {% if report.focus_lost_events == 0 %}Low{% elif report.focus_lost_events <= 3 %}Medium{% else %}High{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>No Face Detected</td>
+                                        <td>{{ report.no_face_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.no_face_events == 0 %}success{% else %}warning{% endif %}">
+                                                {% if report.no_face_events == 0 %}Low{% else %}Medium{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Multiple Faces</td>
+                                        <td>{{ report.multiple_faces_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.multiple_faces_events == 0 %}success{% else %}danger{% endif %}">
+                                                {% if report.multiple_faces_events == 0 %}Low{% else %}High{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Phone Detected</td>
+                                        <td>{{ report.phone_detected_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.phone_detected_events == 0 %}success{% else %}danger{% endif %}">
+                                                {% if report.phone_detected_events == 0 %}Low{% else %}High{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Notes Detected</td>
+                                        <td>{{ report.notes_detected_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.notes_detected_events == 0 %}success{% else %}danger{% endif %}">
+                                                {% if report.notes_detected_events == 0 %}Low{% else %}High{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Device Detected</td>
+                                        <td>{{ report.device_detected_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.device_detected_events == 0 %}success{% else %}danger{% endif %}">
+                                                {% if report.device_detected_events == 0 %}Low{% else %}High{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Drowsiness Detected</td>
+                                        <td>{{ report.drowsiness_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.drowsiness_events == 0 %}success{% else %}warning{% endif %}">
+                                                {% if report.drowsiness_events == 0 %}Low{% else %}Medium{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Audio Anomalies</td>
+                                        <td>{{ report.audio_anomaly_events }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if report.audio_anomaly_events == 0 %}success{% else %}warning{% endif %}">
+                                                {% if report.audio_anomaly_events == 0 %}Low{% else %}Medium{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-download"></i> Export Options
+                </h5>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'reports:export_pdf' report.id %}" class="btn btn-danger w-100 mb-2">
+                    <i class="fas fa-file-pdf"></i> Download PDF Report
+                </a>
+                <a href="{% url 'reports:export_csv' report.id %}" class="btn btn-success w-100 mb-2">
+                    <i class="fas fa-file-csv"></i> Download CSV Data
+                </a>
+                <a href="{% url 'reports:report_list' %}" class="btn btn-secondary w-100">
+                    <i class="fas fa-arrow-left"></i> Back to Reports
+                </a>
+            </div>
+        </div>
+        
+        <!-- Summary Stats -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie"></i> Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ report.focus_loss_count }}</h4>
+                        <small class="text-muted">Focus Loss</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-warning">{{ report.suspicious_events }}</h4>
+                        <small class="text-muted">Suspicious</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-info">{{ report.face_detection_accuracy|floatformat:2 }}</h4>
+                        <small class="text-muted">Face Accuracy</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ report.audio_quality_score|floatformat:2 }}</h4>
+                        <small class="text-muted">Audio Quality</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

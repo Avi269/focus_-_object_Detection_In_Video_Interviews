@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Join Interview{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3><i class="fas fa-video me-2"></i>Join Interview</h3>
+                </div>
+                <div class="card-body">
+                    <div class="interview-info mb-4">
+                        <h4>Interview Session</h4>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Interviewer:</strong> {{ interview.interviewer.get_full_name|default:interview.interviewer.username }}</p>
+                                <p><strong>Scheduled:</strong> {{ interview.start_time|date:"M d, Y - H:i" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Duration:</strong> Not specified</p>
+                                <p><strong>Status:</strong> <span class="badge bg-primary">{{ interview.status|title }}</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pre-interview checklist -->
+                    <div class="checklist mb-4">
+                        <h5>Pre-interview Checklist</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="camera">
+                            <label class="form-check-label" for="camera">
+                                Camera is working properly
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="microphone">
+                            <label class="form-check-label" for="microphone">
+                                Microphone is working properly
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="environment">
+                            <label class="form-check-label" for="environment">
+                                I am in a quiet, well-lit environment
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="terms">
+                            <label class="form-check-label" for="terms">
+                                I understand this interview will be monitored for security
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <form method="post" action="{% url 'interviews:start_interview' interview.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success btn-lg" id="joinBtn" disabled>
+                                <i class="fas fa-play me-2"></i>Start Interview
+                            </button>
+                        </form>
+                        <a href="{% url 'interviews:candidate_dashboard' %}" class="btn btn-outline-secondary mt-2">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Enable join button only when all checkboxes are checked
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.form-check-input');
+    const joinBtn = document.getElementById('joinBtn');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            joinBtn.disabled = !allChecked;
+        });
+    });
+});
+</script>
+{% endblock %}

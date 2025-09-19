@@ -1,0 +1,432 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ user.get_full_name|default:user.username }} - Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+.profile-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+}
+
+.avatar-container {
+    position: relative;
+    display: inline-block;
+}
+
+.avatar-upload {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: white;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.stats-card {
+    border: none;
+    border-radius: 15px;
+    transition: transform 0.3s ease;
+    overflow: hidden;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+}
+
+.stats-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.interview-item {
+    border-left: 4px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.interview-item:hover {
+    border-left-color: #667eea;
+    transform: translateX(5px);
+}
+
+.activity-timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.activity-timeline::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.activity-item {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.activity-item::before {
+    content: '';
+    position: absolute;
+    left: -35px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #667eea;
+}
+
+.quick-actions {
+    position: sticky;
+    top: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Profile Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="profile-header p-4">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <div class="avatar-container">
+                                <i class="fas fa-user-circle fa-5x opacity-75"></i>
+                                <div class="avatar-upload" title="Upload Photo">
+                                    <i class="fas fa-camera text-primary small"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <h2 class="mb-1">{{ user.get_full_name|default:user.username }}</h2>
+                            <p class="mb-2 opacity-75">{{ user.email }}</p>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="badge bg-light text-dark px-3 py-2">
+                                    <i class="fas fa-{% if user.role == 'admin' %}shield-alt{% elif user.role == 'interviewer' %}chalkboard-teacher{% else %}user{% endif %} me-2"></i>
+                                    {{ user.get_role_display }}
+                                </span>
+                                <small class="opacity-75">
+                                    <i class="fas fa-clock me-1"></i>
+                                    Joined {{ user.date_joined|date:"M Y" }}
+                                </small>
+                                <small class="opacity-75">
+                                    <i class="fas fa-sign-in-alt me-1"></i>
+                                    Last seen {{ user.last_login|date:"M d, H:i"|default:"Never" }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="dropdown">
+                                <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-cog me-1"></i>Settings
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{% url 'accounts:edit_profile' %}">
+                                        <i class="fas fa-edit me-2"></i>Edit Profile
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}">
+                                        <i class="fas fa-key me-2"></i>Change Password
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'accounts:activity_log' %}">
+                                        <i class="fas fa-history me-2"></i>Activity Log
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="confirmDeactivation()">
+                                        <i class="fas fa-user-slash me-2"></i>Deactivate Account
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="stats-icon bg-primary text-white mx-auto">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h3 class="mb-1">{{ stats.total_interviews|default:0 }}</h3>
+                    <p class="text-muted mb-0">Total Interviews</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="stats-icon bg-success text-white mx-auto">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 class="mb-1">{{ stats.completed|default:0 }}</h3>
+                    <p class="text-muted mb-0">Completed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="stats-icon bg-warning text-white mx-auto">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3 class="mb-1">{{ stats.upcoming|default:0 }}</h3>
+                    <p class="text-muted mb-0">Upcoming</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="stats-icon bg-info text-white mx-auto">
+                        <i class="fas fa-play-circle"></i>
+                    </div>
+                    <h3 class="mb-1">{{ stats.ongoing|default:0 }}</h3>
+                    <p class="text-muted mb-0">Ongoing</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Upcoming Interviews -->
+            {% if upcoming_interviews %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt text-primary me-2"></i>
+                        Upcoming Interviews
+                    </h5>
+                    <a href="{% url 'interviews:interview_list' %}" class="btn btn-sm btn-outline-primary">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% for interview in upcoming_interviews %}
+                    <div class="interview-item p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="bg-primary text-white rounded p-2">
+                                    <i class="fas fa-calendar"></i>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <h6 class="mb-1">{{ interview.title|default:"Interview Session" }}</h6>
+                                <p class="text-muted mb-1">
+                                    {% if user.role == 'candidate' %}
+                                        with {{ interview.interviewer.get_full_name|default:interview.interviewer.username }}
+                                    {% else %}
+                                        with {{ interview.candidate.get_full_name|default:interview.candidate.username }}
+                                    {% endif %}
+                                </p>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>
+                                    {{ interview.scheduled_time|date:"M d, Y - H:i" }}
+                                </small>
+                            </div>
+                            <div class="col-auto">
+                                <span class="badge bg-info">{{ interview.get_status_display }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Recent Activity -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history text-info me-2"></i>
+                        Recent Activity
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if completed_interviews %}
+                        <div class="activity-timeline">
+                            {% for interview in completed_interviews %}
+                            <div class="activity-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ interview.title|default:"Interview Session" }}</h6>
+                                        <p class="text-muted mb-1">
+                                            {% if user.role == 'candidate' %}
+                                                Interview with {{ interview.interviewer.get_full_name|default:interview.interviewer.username }}
+                                            {% else %}
+                                                Interview with {{ interview.candidate.get_full_name|default:interview.candidate.username }}
+                                            {% endif %}
+                                        </p>
+                                        <small class="text-muted">
+                                            {{ interview.end_time|date:"M d, Y - H:i" }}
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-success">Completed</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                            <h6 class="text-muted">No recent activity</h6>
+                            <p class="text-muted">Your interview history will appear here</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quick Actions -->
+            <div class="card shadow-sm mb-4 quick-actions">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt text-warning me-2"></i>
+                        Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if user.role == 'candidate' %}
+                            <a href="{% url 'interviews:candidate_dashboard' %}" class="btn btn-primary">
+                                <i class="fas fa-tachometer-alt me-2"></i>My Dashboard
+                            </a>
+                            <a href="{% url 'interviews:interview_list' %}" class="btn btn-outline-primary">
+                                <i class="fas fa-calendar me-2"></i>My Interviews
+                            </a>
+                        {% elif user.role == 'interviewer' %}
+                            <a href="{% url 'interviews:schedule_interview' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Schedule Interview
+                            </a>
+                            <a href="{% url 'interviews:interview_list' %}" class="btn btn-outline-primary">
+                                <i class="fas fa-calendar me-2"></i>All Interviews
+                            </a>
+                        {% elif user.role == 'admin' %}
+                            <a href="{% url 'admin:index' %}" class="btn btn-primary">
+                                <i class="fas fa-cog me-2"></i>Admin Panel
+                            </a>
+                            <a href="{% url 'interviews:interview_list' %}" class="btn btn-outline-primary">
+                                <i class="fas fa-calendar me-2"></i>All Interviews
+                            </a>
+                        {% endif %}
+                        
+                        <a href="{% url 'accounts:edit_profile' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-edit me-2"></i>Edit Profile
+                        </a>
+                        <a href="{% url 'accounts:activity_log' %}" class="btn btn-outline-info">
+                            <i class="fas fa-history me-2"></i>Activity Log
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Account Info -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle text-info me-2"></i>
+                        Account Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Username</label>
+                        <div class="fw-bold">{{ user.username }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Email</label>
+                        <div class="fw-bold">{{ user.email }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Role</label>
+                        <div class="fw-bold">{{ user.get_role_display }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Member Since</label>
+                        <div class="fw-bold">{{ user.date_joined|date:"F Y" }}</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label text-muted">Last Active</label>
+                        <div class="fw-bold">{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deactivation Confirmation Modal -->
+<div class="modal fade" id="deactivationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Deactivate Account</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This action cannot be undone. Your account will be deactivated and you will be logged out.
+                </div>
+                <p>Are you sure you want to deactivate your account?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'accounts:deactivate_account' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Deactivate Account</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDeactivation() {
+    const modal = new bootstrap.Modal(document.getElementById('deactivationModal'));
+    modal.show();
+}
+
+// Auto-refresh stats every 30 seconds for ongoing interviews
+{% if stats.ongoing > 0 %}
+setInterval(function() {
+    // Simple refresh indicator
+    document.querySelector('.stats-card .bg-info').style.opacity = '0.5';
+    setTimeout(() => {
+        document.querySelector('.stats-card .bg-info').style.opacity = '1';
+    }, 500);
+}, 30000);
+{% endif %}
+
+console.log('Profile page loaded for {{ user.username }}');
+</script>
+{% endblock %}

@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Start Interview - Proctoring System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    #videoElement {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .detection-status {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    .placeholder-video {
+        width: 100%;
+        height: 300px;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-video"></i> Start Interview Session
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="video-container">
+                    <video id="videoElement" autoplay muted style="display: none;"></video>
+                    <div class="placeholder-video" id="videoPlaceholder">
+                        <div class="text-center">
+                            <i class="fas fa-video fa-3x mb-3"></i>
+                            <h5>Camera Preview</h5>
+                            <p>Click "Enable Camera" to test your setup</p>
+                            <button class="btn btn-outline-light" onclick="startCamera()">
+                                <i class="fas fa-camera me-2"></i>Enable Camera
+                            </button>
+                        </div>
+                    </div>
+                    <div class="detection-status" id="detectionStatus" style="display: none;">
+                        <i class="fas fa-circle text-success"></i> Detection Ready
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Pre-Interview Instructions:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Ensure your camera and microphone are working properly</li>
+                            <li>Make sure you have good lighting and a clear background</li>
+                            <li>Test your internet connection stability</li>
+                            <li>Close unnecessary applications to avoid distractions</li>
+                            <li>Have the candidate ready to join the session</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <form method="post" class="mt-4" id="startForm">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'interviews:interview_detail' interview.id %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Details
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg" id="startButton">
+                            <i class="fas fa-play"></i> Start Interview Now
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Interview Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Title:</strong> {{ interview.title|default:"Interview Session" }}</p>
+                <p><strong>Candidate:</strong> {{ interview.candidate.get_full_name|default:interview.candidate.username }}</p>
+                <p><strong>Interviewer:</strong> {{ interview.interviewer.get_full_name|default:interview.interviewer.username }}</p>
+                <p><strong>Scheduled:</strong> {{ interview.scheduled_time|date:"M d, Y H:i" }}</p>
+                <p><strong>Duration:</strong> {{ interview.duration|default:"Not specified" }} minutes</p>
+                <p><strong>Status:</strong> 
+                    <span class="badge bg-secondary">{{ interview.get_status_display }}</span>
+                </p>
+                {% if interview.description %}
+                <div class="mt-3">
+                    <strong>Description:</strong>
+                    <div class="bg-light p-2 rounded mt-1">
+                        {{ interview.description }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-shield-alt"></i> System Check
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="systemCheck">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Camera Access</span>
+                        <span class="badge bg-secondary" id="cameraStatus">Not Tested</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Microphone Access</span>
+                        <span class="badge bg-secondary" id="micStatus">Not Tested</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Detection System</span>
+                        <span class="badge bg-success" id="detectionSystemStatus">Ready</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Network Connection</span>
+                        <span class="badge bg-success" id="networkStatus">Connected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-clipboard-check"></i> Checklist
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="techCheck">
+                    <label class="form-check-label" for="techCheck">
+                        Technical setup verified
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="candidateReady">
+                    <label class="form-check-label" for="candidateReady">
+                        Candidate is ready to join
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="environmentCheck">
+                    <label class="form-check-label" for="environmentCheck">
+                        Interview environment prepared
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let stream = null;
+    
+    // Function to start camera
+    function startCamera() {
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(function(mediaStream) {
+                stream = mediaStream;
+                const videoElement = document.getElementById('videoElement');
+                const placeholder = document.getElementById('videoPlaceholder');
+                const detectionStatus = document.getElementById('detectionStatus');
+                
+                videoElement.srcObject = stream;
+                videoElement.style.display = 'block';
+                placeholder.style.display = 'none';
+                detectionStatus.style.display = 'block';
+                
+                // Update status indicators
+                document.getElementById('cameraStatus').textContent = 'Working';
+                document.getElementById('cameraStatus').className = 'badge bg-success';
+                document.getElementById('micStatus').textContent = 'Working';
+                document.getElementById('micStatus').className = 'badge bg-success';
+            })
+            .catch(function(err) {
+                console.error('Error accessing media devices:', err);
+                alert('Error accessing camera/microphone. Please check permissions and try again.');
+                
+                // Update status indicators
+                document.getElementById('cameraStatus').textContent = 'Failed';
+                document.getElementById('cameraStatus').className = 'badge bg-danger';
+                document.getElementById('micStatus').textContent = 'Failed';
+                document.getElementById('micStatus').className = 'badge bg-danger';
+            });
+    }
+    
+    // Enable start button only when checklist is complete
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('.form-check-input');
+        const startButton = document.getElementById('startButton');
+        
+        function updateStartButton() {
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            startButton.disabled = !allChecked;
+            
+            if (allChecked) {
+                startButton.innerHTML = '<i class="fas fa-play"></i> Start Interview Now';
+                startButton.className = 'btn btn-success btn-lg';
+            } else {
+                startButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Complete Checklist First';
+                startButton.className = 'btn btn-warning btn-lg';
+            }
+        }
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateStartButton);
+        });
+        
+        // Initial state
+        updateStartButton();
+    });
+    
+    // Form submission handler
+    document.getElementById('startForm').addEventListener('submit', function(e) {
+        const allChecked = Array.from(document.querySelectorAll('.form-check-input')).every(cb => cb.checked);
+        
+        if (!allChecked) {
+            e.preventDefault();
+            alert('Please complete all checklist items before starting the interview.');
+            return false;
+        }
+        
+        // Show loading state
+        const startButton = document.getElementById('startButton');
+        startButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Interview...';
+        startButton.disabled = true;
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+    });
+
+    // Add this to the existing script section
+window.addEventListener('beforeunload', function(e) {
+    // Stop detection when user leaves page
+    fetch(`{% url 'interviews:stop_detection' interview.id %}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+        keepalive: true // Ensure request completes even if page is closing
+    }).catch(error => console.error('Error stopping detection:', error));
+});
+
+</script>
+{% endblock %}

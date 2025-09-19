@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Reports - Proctoring System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-chart-bar"></i> Reports</h2>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Candidate</th>
+                            <th>Interview Date</th>
+                            <th>Duration</th>
+                            <th>Integrity Score</th>
+                            <th>Focus Loss</th>
+                            <th>Suspicious Events</th>
+                            <th>Generated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in page_obj %}
+                            <tr>
+                                <td>
+                                    <strong>{{ report.candidate_name }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ report.interview.candidate.username }}</small>
+                                </td>
+                                <td>{{ report.interview.start_time|date:"M d, Y H:i" }}</td>
+                                <td>
+                                    {% if report.total_duration %}
+                                        {{ report.total_duration }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if report.integrity_score >= 90 %}success{% elif report.integrity_score >= 70 %}warning{% elif report.integrity_score >= 50 %}danger{% else %}dark{% endif %} fs-6">
+                                        {{ report.integrity_score }}/100
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if report.focus_loss_count == 0 %}success{% elif report.focus_loss_count <= 3 %}warning{% else %}danger{% endif %}">
+                                        {{ report.focus_loss_count }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if report.suspicious_events == 0 %}success{% elif report.suspicious_events <= 2 %}warning{% else %}danger{% endif %}">
+                                        {{ report.suspicious_events }}
+                                    </span>
+                                </td>
+                                <td>{{ report.generated_at|date:"M d, Y H:i" }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'reports:report_detail' report.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                        <a href="{% url 'reports:export_pdf' report.id %}" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-file-pdf"></i> PDF
+                                        </a>
+                                        <a href="{% url 'reports:export_csv' report.id %}" class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-file-csv"></i> CSV
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+                <nav aria-label="Report pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1">&laquo; First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No reports found</h4>
+                <p class="text-muted">No reports have been generated yet.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
