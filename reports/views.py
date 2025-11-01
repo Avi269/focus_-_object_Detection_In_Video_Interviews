@@ -1,100 +1,138 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
-from django.core.paginator import Paginator
-from django.http import HttpResponse, JsonResponse
+from django.db.models import Q, Count, Avg
 from django.utils import timezone
 from .models import Report
-from .forms import ReportForm
-from .serializers import ReportSerializer
+from .serializers import ReportListSerializer, ReportDetailSerializer  # FIX: Updated import
 from .utils import generate_pdf, generate_csv
 from interviews.models import Interview
 from detection.models import EventLog
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+import logging
 
-
-@login_required
-def generate_report(request, interview_id):
-    """Generate a report for a completed interview"""
-    interview = get_object_or_404(Interview, id=interview_id)
-    
-    if interview.status != 'completed':
-        messages.error(request, 'Can only generate reports for completed interviews.')
-        return redirect('interviews:interview_detail', interview_id=interview.id)
-    
-    # Check if report already exists
-    if hasattr(interview, 'report'):
-        messages.info(request, 'Report already exists for this interview.')
-        return redirect('reports:report_detail', report_id=interview.report.id)
-    
-    # Get event logs for this interview
-    events = EventLog.objects.filter(interview=interview)
-    
-    # Calculate metrics
-    focus_lost_events = events.filter(event_type='focus_lost').count()
-    suspicious_events = events.filter(
-        event_type__in=['phone_detected', 'notes_detected', 'device_detected', 'multiple_faces']
-    ).count()
-    
-    # Create report
-    report = Report.objects.create(
-        interview=interview,
-        candidate_name=interview.candidate.get_full_name() or interview.candidate.username,
-        focus_loss_count=focus_lost_events,
-        suspicious_events=suspicious_events,
-        total_duration=interview.duration,
-        focus_lost_events=events.filter(event_type='focus_lost').count(),
-        no_face_events=events.filter(event_type='no_face').count(),
-        multiple_faces_events=events.filter(event_type='multiple_faces').count(),
-        phone_detected_events=events.filter(event_type='phone_detected').count(),
-        notes_detected_events=events.filter(event_type='notes_detected').count(),
-        device_detected_events=events.filter(event_type='device_detected').count(),
-        drowsiness_events=events.filter(event_type='drowsiness').count(),
-        audio_anomaly_events=events.filter(event_type='audio_anomaly').count(),
-    )
-    
-    # Calculate integrity score
-    report.calculate_integrity_score()
-    report.save()
-    
-    messages.success(request, 'Report generated successfully!')
-    return redirect('reports:report_detail', report_id=report.id)
-
-
-@login_required
-def report_detail(request, report_id):
-    """View detailed report"""
-    report = get_object_or_404(Report, id=report_id)
-    
-    # Check permissions
-    if request.user.role == 'candidate' and report.interview.candidate != request.user:
-        messages.error(request, 'You do not have permission to view this report.')
-        return redirect('reports:report_list')
-    elif request.user.role == 'interviewer' and report.interview.interviewer != request.user:
-        messages.error(request, 'You do not have permission to view this report.')
-        return redirect('reports:report_list')
-    
-    return render(request, 'reports/report_detail.html', {'report': report})
+logger = logging.getLogger(__name__)
 
 
 @login_required
 def report_list(request):
-    """List all reports"""
-    reports = Report.objects.all().order_by('-generated_at')
+    """Display list of all reports with filtering"""
+    reports = Report.objects.select_related('interview__candidate', 'interview__interviewer').all()
     
-    # Filter based on user role
-    if request.user.role == 'candidate':
-        reports = reports.filter(interview__candidate=request.user)
-    elif request.user.role == 'interviewer':
-        reports = reports.filter(interview__interviewer=request.user)
+    # Apply filters
+    candidate_name = request.GET.get('candidate_name', '')
+    min_score = request.GET.get('min_integrity_score', '')
+    max_score = request.GET.get('max_integrity_score', '')
     
-    paginator = Paginator(reports, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    if candidate_name:
+        reports = reports.filter(candidate_name__icontains=candidate_name)
     
-    return render(request, 'reports/report_list.html', {'page_obj': page_obj})
+    if min_score:
+        try:
+            reports = reports.filter(integrity_score__gte=int(min_score))
+        except ValueError:
+            pass
+    
+    if max_score:
+        try:
+            reports = reports.filter(integrity_score__lte=int(max_score))
+        except ValueError:
+            pass
+    
+    context = {
+        'reports': reports,
+        'candidate_name': candidate_name,
+        'min_score': min_score,
+        'max_score': max_score,
+    }
+    
+    return render(request, 'reports/report_list.html', context)
+
+
+@login_required
+def report_detail(request, report_id):
+    """Display detailed report view"""
+    report = get_object_or_404(
+        Report.objects.select_related('interview__candidate', 'interview__interviewer'),
+        id=report_id
+    )
+    
+    # Get event breakdown
+    events = report.interview.event_logs.all()
+    event_timeline = events.order_by('timestamp')[:50]  # Last 50 events
+    
+    context = {
+        'report': report,
+        'event_timeline': event_timeline,
+        'total_events': events.count(),
+    }
+    
+    return render(request, 'reports/report_detail.html', context)
+
+
+@login_required
+def generate_report(request, interview_id):
+    """Generate or regenerate report for an interview"""
+    interview = get_object_or_404(Interview, id=interview_id)
+    
+    # Check if interview is completed
+    if interview.status != 'completed':
+        messages.error(request, 'Cannot generate report for incomplete interview.')
+        return redirect('interviews:interview_detail', interview_id=interview_id)
+    
+    # Check if report already exists
+    try:
+        report = interview.report
+        messages.info(request, 'Report already exists. Regenerating with updated data...')
+    except Report.DoesNotExist:
+        report = Report(interview=interview)
+    
+    # Calculate metrics
+    report.candidate_name = interview.candidate.get_full_name() or interview.candidate.username
+    
+    # Calculate duration
+    if interview.start_time and interview.end_time:
+        report.total_duration = interview.end_time - interview.start_time
+    
+    # Get event counts
+    events = interview.event_logs.all()
+    report.focus_lost_events = events.filter(event_type='focus_lost').count()
+    report.no_face_events = events.filter(event_type='no_face').count()
+    report.multiple_faces_events = events.filter(event_type='multiple_faces').count()
+    report.phone_detected_events = events.filter(event_type='phone_detected').count()
+    report.notes_detected_events = events.filter(event_type='notes_detected').count()
+    report.device_detected_events = events.filter(event_type='device_detected').count()
+    report.drowsiness_events = events.filter(event_type='drowsiness').count()
+    report.audio_anomaly_events = events.filter(event_type='audio_anomaly').count()
+    
+    # Calculate legacy fields
+    report.focus_loss_count = report.focus_lost_events
+    report.suspicious_events = (
+        report.phone_detected_events + report.notes_detected_events + 
+        report.device_detected_events + report.multiple_faces_events
+    )
+    
+    # Calculate quality scores (placeholder - replace with actual calculations)
+    total_events = events.count()
+    if total_events > 0:
+        face_events = report.no_face_events + report.multiple_faces_events
+        report.face_detection_accuracy = max(0.0, 1.0 - (face_events / max(total_events, 1)))
+        report.audio_quality_score = max(0.0, 1.0 - (report.audio_anomaly_events / max(total_events, 1)))
+    else:
+        report.face_detection_accuracy = 1.0
+        report.audio_quality_score = 1.0
+    
+    # Calculate integrity score
+    report.calculate_integrity_score()
+    
+    # Generate recommendations
+    report.generate_recommendations()
+    
+    # Save report
+    report.save()
+    
+    messages.success(request, f'Report generated successfully with integrity score: {report.integrity_score}')
+    return redirect('reports:report_detail', report_id=report.id)
 
 
 @login_required
@@ -102,21 +140,24 @@ def export_pdf(request, report_id):
     """Export report as PDF"""
     report = get_object_or_404(Report, id=report_id)
     
-    # Check permissions
-    if request.user.role == 'candidate' and report.interview.candidate != request.user:
-        messages.error(request, 'You do not have permission to export this report.')
-        return redirect('reports:report_list')
-    elif request.user.role == 'interviewer' and report.interview.interviewer != request.user:
-        messages.error(request, 'You do not have permission to export this report.')
-        return redirect('reports:report_list')
-    
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="report_{report.id}.pdf"'
-    
-    pdf_content = generate_pdf(report)
-    response.write(pdf_content)
-    
-    return response
+    try:
+        pdf_data = generate_pdf(report)
+        
+        # Update export tracking
+        report.pdf_generated = True
+        report.last_exported_at = timezone.now()
+        report.save(update_fields=['pdf_generated', 'last_exported_at'])
+        
+        response = HttpResponse(pdf_data, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="report_{report.id}_{report.candidate_name}.pdf"'
+        
+        logger.info(f"PDF exported for report {report.id}")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error exporting PDF: {e}", exc_info=True)
+        messages.error(request, 'Failed to generate PDF. Please try again.')
+        return redirect('reports:report_detail', report_id=report_id)
 
 
 @login_required
@@ -124,50 +165,52 @@ def export_csv(request, report_id):
     """Export report as CSV"""
     report = get_object_or_404(Report, id=report_id)
     
-    # Check permissions
-    if request.user.role == 'candidate' and report.interview.candidate != request.user:
-        messages.error(request, 'You do not have permission to export this report.')
-        return redirect('reports:report_list')
-    elif request.user.role == 'interviewer' and report.interview.interviewer != request.user:
-        messages.error(request, 'You do not have permission to export this report.')
-        return redirect('reports:report_list')
-    
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="report_{report.id}.csv"'
-    
-    csv_content = generate_csv(report)
-    response.write(csv_content.decode('utf-8'))
-    
-    return response
+    try:
+        csv_data = generate_csv(report)
+        
+        # Update export tracking
+        report.csv_generated = True
+        report.last_exported_at = timezone.now()
+        report.save(update_fields=['csv_generated', 'last_exported_at'])
+        
+        response = HttpResponse(csv_data, content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="report_{report.id}_{report.candidate_name}.csv"'
+        
+        logger.info(f"CSV exported for report {report.id}")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error exporting CSV: {e}", exc_info=True)
+        messages.error(request, 'Failed to generate CSV. Please try again.')
+        return redirect('reports:report_detail', report_id=report_id)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
+# API Views
+@login_required
 def report_api(request, report_id):
-    """API endpoint to get report data"""
+    """API endpoint for single report"""
     report = get_object_or_404(Report, id=report_id)
-    
-    # Check permissions
-    if request.user.role == 'candidate' and report.interview.candidate != request.user:
-        return Response({'error': 'Permission denied'}, status=403)
-    elif request.user.role == 'interviewer' and report.interview.interviewer != request.user:
-        return Response({'error': 'Permission denied'}, status=403)
-    
-    serializer = ReportSerializer(report)
-    return Response(serializer.data)
+    serializer = ReportDetailSerializer(report, context={'request': request})
+    return JsonResponse(serializer.data)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@login_required
 def reports_api(request):
-    """API endpoint to get all reports for the user"""
-    reports = Report.objects.all().order_by('-generated_at')
+    """API endpoint for report list"""
+    reports = Report.objects.select_related('interview__candidate', 'interview__interviewer').all()
     
-    # Filter based on user role
-    if request.user.role == 'candidate':
-        reports = reports.filter(interview__candidate=request.user)
-    elif request.user.role == 'interviewer':
-        reports = reports.filter(interview__interviewer=request.user)
+    # Apply filters
+    candidate_name = request.GET.get('candidate_name', '')
+    min_score = request.GET.get('min_score', '')
     
-    serializer = ReportSerializer(reports, many=True)
-    return Response(serializer.data)
+    if candidate_name:
+        reports = reports.filter(candidate_name__icontains=candidate_name)
+    
+    if min_score:
+        try:
+            reports = reports.filter(integrity_score__gte=int(min_score))
+        except ValueError:
+            pass
+    
+    serializer = ReportListSerializer(reports, many=True, context={'request': request})
+    return JsonResponse({'results': serializer.data})

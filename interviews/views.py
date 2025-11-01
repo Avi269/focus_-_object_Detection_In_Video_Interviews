@@ -10,7 +10,9 @@ from .forms import InterviewForm, VideoRecordingForm
 from detection.detection_engine import start_detection, stop_detection, is_detection_active, analyze_video_file
 from datetime import timedelta
 from django.db import transaction
+import logging
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def schedule_interview(request):
@@ -31,11 +33,11 @@ def start_interview(request, interview_id):
     
     # Check permissions
     if request.user.role not in ['admin', 'interviewer'] and interview.interviewer != request.user:
-        messages.error(request, '  You are not authorized to start this interview.')
+        logger.warning(f"Unauthorized start attempt by {request.user.username} for interview {interview_id}")
+        messages.error(request, '❌ You are not authorized to start this interview.')
         return redirect('interviews:interview_list')
     
     if request.method == 'POST':
-        # Start the interview with database transaction
         with transaction.atomic():
             interview.status = 'ongoing'
             now = timezone.now()
@@ -43,15 +45,15 @@ def start_interview(request, interview_id):
                 interview.start_time = now
             interview.save()
         
-        print(f"✅ Interview {interview.id} status updated to 'ongoing'")
+        logger.info(f"Interview {interview.id} started by {request.user.username}")
         
-        # Start detection with proper thread management
         try:
             detection_duration = interview.duration if interview.duration else 30
             start_detection(interview, detection_duration)
+            logger.info(f"Detection started for interview {interview.id}")
             messages.success(request, '✅ Interview started! Detection is now active.')
         except Exception as e:
-            print(f"  Detection start failed: {e}")
+            logger.error(f"Detection start failed for interview {interview_id}: {e}")
             messages.warning(request, f'⚠️ Interview started but detection failed: {str(e)}')
         
         return redirect('interviews:interview_detail', interview_id=interview.id)
@@ -60,58 +62,36 @@ def start_interview(request, interview_id):
 
 @login_required
 def end_interview(request, interview_id):
-    print(f"📩 Request method: {request.method}")
-    print(f"👤 User: {request.user}, Role: {getattr(request.user, 'role', None)}")
-
     interview = get_object_or_404(Interview, id=interview_id)
     
     # Check permissions
     if request.user.role not in ['admin', 'interviewer'] and interview.interviewer != request.user:
-        messages.error(request, '  You are not authorized to end this interview.')
+        messages.error(request, '❌ You are not authorized to end this interview.')
         return redirect('interviews:interview_list')
     
     if request.method == 'POST':
-        print(f"  Ending interview {interview.id}")
-        
-        # CRITICAL FIX: Stop detection FIRST, then update database
-        try:
-            # Mark interview as completed early so detection thread sees status change
+        # SIMPLIFIED: Use atomic transaction
+        with transaction.atomic():
+            # Stop detection first
+            try:
+                stop_detection(interview.id)
+            except Exception as e:
+                print(f"⚠️ Detection stop error: {e}")
+            
+            # Update interview status
             interview.status = 'completed'
             interview.end_time = timezone.now()
             interview.save()
-            print(f"🔁 Interview {interview.id} marked completed before stopping detection")
-
-            stop_detection(interview.id)
-            print(f"✅ stop_detection returned for interview {interview.id}")
-
-            # Double-check and run cleanup fallback if necessary
-            from detection.detection_engine import is_detection_active, cleanup_inactive_threads, force_stop_all_detection
-            if is_detection_active(interview.id):
-                print(f"⚠️ Detection still active for {interview.id} after stop_detection(); attempting cleanup")
-                cleaned = cleanup_inactive_threads()
-                print(f"🧹 cleanup_inactive_threads removed {cleaned} entries")
-                if is_detection_active(interview.id):
-                    print(f"🚨 Forcing stop for remaining detection threads for interview {interview.id}")
-                    force_stop_all_detection()
-            else:
-                print(f"🔍 Detection inactive for interview {interview.id}")
-        except Exception as e:
-            print(f"  Error stopping detection: {e}")
-        
-        # Ensure interview save already performed; show status
-        print(f"✅ Interview {interview.id} status now: {interview.status}")
-        interview.refresh_from_db()
-        print(f"🔍 Interview {interview.id} status after save: {interview.status}")
         
         messages.success(request, '✅ Interview completed successfully!')
         return redirect('interviews:interview_detail', interview_id=interview.id)
     
-    # GET request - show end interview page
+    # GET request - show confirmation page
     from detection.models import EventLog
     recent_events = EventLog.objects.filter(interview=interview).order_by('-timestamp')[:6]
     total_events = EventLog.objects.filter(interview=interview).count()
     
-    # Calculate integrity score
+    # Calculate integrity score preview
     integrity_score = max(0, 100 - (total_events * 5))
     
     context = {

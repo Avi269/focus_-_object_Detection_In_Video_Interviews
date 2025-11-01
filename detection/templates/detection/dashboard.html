@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Detection Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>🔍 Detection Dashboard</h1>
+    
+    {% if error %}
+    <div class="alert alert-danger">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+    
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Active Detections</h5>
+                    <h2 class="text-primary">{{ active_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Total Events</h5>
+                    <h2 class="text-info">{{ total_events }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">High Severity</h5>
+                    <h2 class="text-danger">{{ high_severity_count }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Events -->
+    <h3>Recent Events</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Interview</th>
+                <th>Event Type</th>
+                <th>Severity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in recent_events %}
+            <tr>
+                <td>{{ event.timestamp|date:"Y-m-d H:i:s" }}</td>
+                <td>{{ event.interview.title }}</td>
+                <td>{{ event.get_event_type_display }}</td>
+                <td>
+                    <span class="badge badge-{{ event.severity }}">
+                        {{ event.get_severity_display }}
+                    </span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center">No events yet</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

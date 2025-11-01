@@ -1,8 +1,15 @@
-from datetime import timezone
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate, update_session_auth_hash, get_user_model
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView, LogoutView, PasswordChangeView
+from django.contrib.auth.views import (
+    LoginView, 
+    LogoutView, 
+    PasswordChangeView,
+    PasswordResetView, 
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView
+)
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
 from django.urls import reverse_lazy, reverse
@@ -17,7 +24,11 @@ from .forms import UserRegistrationForm, UserProfileForm
 from .models import User
 from interviews.models import Interview
 import json
+from django_ratelimit.decorators import ratelimit
+from django.utils import timezone  # Add this import at the top
+from datetime import timezone as dt_timezone  # Change existing import
 
+@ratelimit(key='ip', rate='5/m', method='POST')
 def register_view(request):
     """User registration view with role-based redirect"""
     if request.user.is_authenticated:
@@ -411,3 +422,26 @@ def health_check(request):
         'timestamp': timezone.now().isoformat(),
         'service': 'proctoring_system'
     })
+
+class CustomPasswordResetView(PasswordResetView):
+    template_name = 'accounts/password_reset.html'
+    email_template_name = 'accounts/password_reset_email.html'
+    success_url = reverse_lazy('accounts:password_reset_done')
+    
+    def form_valid(self, form):
+        messages.info(self.request, '📧 Password reset link sent to your email.')
+        return super().form_valid(form)
+
+class CustomPasswordResetDoneView(PasswordResetDoneView):
+    template_name = 'accounts/password_reset_done.html'
+
+class CustomPasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = 'accounts/password_reset_confirm.html'
+    success_url = reverse_lazy('accounts:password_reset_complete')
+    
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Password reset successful!')
+        return super().form_valid(form)
+
+class CustomPasswordResetCompleteView(PasswordResetCompleteView):
+    template_name = 'accounts/password_reset_complete.html'
