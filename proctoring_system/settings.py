@@ -25,11 +25,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-0tpqz887_1^z)e!ng^*l#b64%cltl1$s_rjvbzn1h&470$-bc3')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True').lower() in {'1', 'true', 'yes', 'on'}
+DEBUG = os.getenv('DEBUG', 'False').lower() in {'1', 'true', 'yes', 'on'}
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
+    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver,.onrender.com').split(',')
     if host.strip()
 ]
 
@@ -39,7 +39,7 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     CSRF_TRUSTED_ORIGINS = [
         origin.strip()
-        for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.onrender.com').split(',')
+        for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.onrender.com,https://*.onrender.com').split(',')
         if origin.strip()
     ]
 
