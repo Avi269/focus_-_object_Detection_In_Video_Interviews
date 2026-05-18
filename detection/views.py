@@ -523,3 +523,79 @@ def detection_settings(request):
     }
     
     return render(request, 'detection/settings.html', context)
+
+
+# ============================================================================
+# ADDITIONAL VIEWS
+# ============================================================================
+
+@login_required
+def detection_summary(request, interview_id):
+    """Get detection summary for an interview"""
+    interview = get_object_or_404(Interview, id=interview_id)
+    
+    # Check permissions
+    if (request.user.role == 'candidate' and interview.candidate != request.user) or \
+       (request.user.role == 'interviewer' and interview.interviewer != request.user):
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    try:
+        summary = get_detection_summary(interview)
+        
+        return JsonResponse({
+            'interview_id': interview_id,
+            'summary': summary,
+            'detection_active': is_detection_active(interview_id)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Failed to get summary: {str(e)}'
+        }, status=500)
+
+
+@login_required
+def manual_event_log(request):
+    """Manual event logging form (for testing/admin use)"""
+    if not request.user.is_staff:
+        messages.error(request, '❌ Unauthorized - Admin access required')
+        return redirect('detection:general_dashboard')
+    
+    if request.method == 'POST':
+        try:
+            interview_id = request.POST.get('interview_id')
+            event_type = request.POST.get('event_type')
+            description = request.POST.get('description', '')
+            confidence_score = float(request.POST.get('confidence_score', 0.5))
+            
+            interview = Interview.objects.get(id=interview_id)
+            
+            success = log_event(interview, event_type, description, confidence_score)
+            
+            if success:
+                messages.success(request, f'✅ Event logged: {event_type}')
+            else:
+                messages.error(request, '❌ Failed to log event')
+                
+        except Interview.DoesNotExist:
+            messages.error(request, '❌ Interview not found')
+        except Exception as e:
+            messages.error(request, f'❌ Error: {str(e)}')
+        
+        return redirect('detection:general_dashboard')
+    
+    # GET request - show form
+    ongoing_interviews = Interview.objects.filter(status='ongoing')
+    event_types = EventLog.EVENT_TYPE_CHOICES
+    
+    context = {
+        'ongoing_interviews': ongoing_interviews,
+        'event_types': event_types
+    }
+    
+    return render(request, 'detection/manual_event_log.html', context)
+
+
+# ============================================================================
+# ADMIN VIEWS (keep existing code below)
+# ============================================================================
